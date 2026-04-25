@@ -1,16 +1,19 @@
-## Hi there 👋
+# Matt Danese
 
-<!--
-**MattDanese/MattDanese** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+B2B demand gen leader building AI-powered growth systems in public.  
+Formerly Meta, Medely. Currently Senior Demand Gen @ Regal.AI.
 
-Here are some ideas to get you started:
+## 📨 The Demand Engine(er)
+A newsletter documenting the AI systems I build for demand gen —
+pipelines, workflows, PRDs, and the decisions behind them.
+Written for senior marketers who want to build with AI.
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+→ **[thedemandengineer.com](https://thedemandengineer.com)**
+
+## 🔧 What I Build
+- AI-powered channel analysis & reporting pipelines
+- Lead quality scoring systems (ICP segmentation at scale)
+- Automated A/B testing workflows (Autoresearch + Autogrowth)
+
+---
+*If you're in B2B demand gen or growth — the newsletter is for you.*
