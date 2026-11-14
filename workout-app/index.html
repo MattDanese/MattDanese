@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1115" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="M-F Lift" />
+  <title>M-F Lift</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">▲</span> M-F Lift</div>
+    <div id="topbar-meta" class="muted small"></div>
+  </header>
+
+  <main id="view" class="view" aria-live="polite"></main>
+
+  <div id="timer" class="timer hidden" role="timer">
+    <div class="timer-label">Rest</div>
+    <div id="timer-time" class="timer-time">0:00</div>
+    <button class="btn ghost sm" data-timer="-15">−15s</button>
+    <button class="btn ghost sm" data-timer="+30">+30s</button>
+    <button class="btn sm" data-timer="skip">Skip</button>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button data-tab="today" class="tab active"><span class="ti">●</span>Today</button>
+    <button data-tab="week" class="tab"><span class="ti">▦</span>Week</button>
+    <button data-tab="progress" class="tab"><span class="ti">↗</span>Progress</button>
+    <button data-tab="program" class="tab"><span class="ti">☰</span>Program</button>
+  </nav>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="program.js"></script>
+  <script src="logic.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
