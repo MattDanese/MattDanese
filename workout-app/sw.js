@@ -1,5 +1,5 @@
 // Offline cache: serve app files from the cache, refreshing them in the background.
-const CACHE = 'mf-lift-v1';
+const CACHE = 'mf-lift-v2';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'logic.js', 'program.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
