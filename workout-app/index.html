@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f1115" />
+  <meta name="theme-color" content="#0d0f13" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="M-F Lift" />
@@ -15,28 +16,42 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="logo">▲</span> M-F Lift</div>
-    <div id="topbar-meta" class="muted small"></div>
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="color:var(--accent)"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>
+      M-F Lift
+    </div>
+    <div id="topbar-meta" class="topbar-meta"></div>
   </header>
 
   <main id="view" class="view" aria-live="polite"></main>
 
-  <div id="timer" class="timer hidden" role="timer">
-    <div class="timer-label">Rest</div>
-    <div id="timer-time" class="timer-time">0:00</div>
-    <button class="btn ghost sm" data-timer="-15">−15s</button>
-    <button class="btn ghost sm" data-timer="+30">+30s</button>
-    <button class="btn sm" data-timer="skip">Skip</button>
+  <div id="timer" class="timer hidden" role="timer" aria-live="off">
+    <div class="timer-top">
+      <div class="grow">
+        <div class="timer-label" id="timer-label">Rest</div>
+        <div id="timer-time" class="timer-time">0:00</div>
+      </div>
+      <button class="btn ghost sm" data-timer="-15" aria-label="Remove 15 seconds">−15</button>
+      <button class="btn ghost sm" data-timer="+30" aria-label="Add 30 seconds">+30</button>
+      <button class="btn sm" data-timer="skip">Skip</button>
+    </div>
+    <div id="timer-next" class="timer-next"></div>
+    <div class="timer-fill" id="timer-fill"></div>
   </div>
 
   <nav class="tabs" role="tablist">
-    <button data-tab="today" class="tab active"><span class="ti">●</span>Today</button>
-    <button data-tab="week" class="tab"><span class="ti">▦</span>Week</button>
-    <button data-tab="progress" class="tab"><span class="ti">↗</span>Progress</button>
-    <button data-tab="program" class="tab"><span class="ti">☰</span>Program</button>
+    <button data-tab="today" class="tab active" role="tab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>Workout</button>
+    <button data-tab="week" class="tab" role="tab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Week</button>
+    <button data-tab="progress" class="tab" role="tab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19h16M5 15l4-4 3 3 7-7"/><path d="M15 7h4v4"/></svg>Progress</button>
+    <button data-tab="program" class="tab" role="tab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg>Plan</button>
   </nav>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="sheet" class="sheet-wrap hidden"></div>
+  <div id="toast" class="toast hidden" role="status"></div>
 
   <script src="program.js"></script>
   <script src="logic.js"></script>

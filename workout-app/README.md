@@ -1,32 +1,33 @@
 # M-F Lift
 
-A phone-friendly workout tracker for the Muscle & Strength
-[M-F Workout Routine](https://www.muscleandstrength.com/workouts/m-f-workout-routine), a 5-day body-part split:
+A phone-friendly workout tracker built on the Muscle & Strength
+[M-F Workout Routine](https://www.muscleandstrength.com/workouts/m-f-workout-routine), tuned for building muscle and getting lean.
 
-| Day | Focus | Lead lift |
-| --- | --- | --- |
-| Mon | Back | Deadlift 4×6 |
-| Tue | Chest & Abs | Incline Bench Press 4×6 |
-| Wed | Legs | Barbell Back Squat 5×6 |
-| Thu | Shoulders & Abs | Military Press 4×6 |
-| Fri | Arms | Close-Grip Bench Press 4×6–8 |
-| Sat/Sun | Rest + optional cardio | |
+## The plan
 
-> The day structure and lead lifts come from the source routine. Accessory exercises marked **check** in
-> the Program tab are placeholders. Compare them with the article and edit or confirm them in the app.
+| Day | Focus | Lead lift | 2nd hit for |
+| --- | --- | --- | --- |
+| Mon | Back & rear delts | Deadlift 3×5–6 | |
+| Tue | Chest & Abs | Incline Bench Press 4×6–8 | |
+| Wed | Legs | Barbell Back Squat 4×6–8 | |
+| Thu | Shoulders & Abs | Military Press 4×6–8 | Chest (incline DB press) |
+| Fri | Arms | Chin-Up 3×6–12 | Back (chin-ups), calves |
+| Sat/Sun | Rest, steps and cardio | | |
 
-## What it does
+- **About 2× a week per muscle** and 10–20 hard sets per muscle per week. That's more growth than the classic once-a-week split.
+- **Rep ranges plus double progression.** Once you hit the top of the range on every set, the app adds weight.
+- **Effort targets.** Stop 1–2 reps short on big lifts; take the last set of accessory work to failure.
+- **6-week cycles.** 5 build weeks, then a deload week with about 60% of the sets.
+- **Goal-based targets** (build / build & lean out / get shredded): calories, protein, carbs, fat, steps and cardio minutes. A weekly check-in compares your 7-day average body weight against the target rate and tells you what to change.
 
-- **Today** opens the right workout for the day. Log weight and reps for each set and check it off, which starts a rest timer (2:30 for big lifts, 1:30 for accessories). If you miss a day, you can make it up later in the week.
-- **Built-in progressive overload** (double progression). Each exercise shows what you did last time and what to do today:
-  - Hit the top of the rep range on every set → add weight (+10 lb on squat/deadlift-type lifts, +5 lb on everything else; 5 / 2.5 kg).
-  - Partial success → same weight, add reps.
-  - Missed the bottom of the range two sessions in a row → deload about 10%.
-- **Week**: Mon–Sun completion grid, volume compared with last week, hard sets per muscle group, a streak of full weeks, and body-weight logging.
-- **Progress**: estimated 1-rep-max chart for any exercise, best lifts board, body-weight trend, and full workout history.
-- **Program**: edit exercises, sets and rep ranges, switch between lb and kg, set rest times, export/import backups, and a short guide to eating and recovery for building muscle.
+## The app
 
-All data stays in your browser (localStorage) with no account or server. Use **Export backup** from time to time.
+- **Workout**: a week strip to choose the day; a preview with the exercises, sets and estimated time; then a focused view of one exercise at a time with today's target weight and reps, a form tip, warm-up sets, the next set highlighted, and a rest timer that shows what's up next. It moves to the next exercise automatically.
+- **Week**: day-by-day status, cycle progress, daily nutrition targets, weekly check-in, and sets per muscle group (done vs planned).
+- **Progress**: estimated 1-rep max for the main lifts, a chart for any exercise, body-weight trend, and history.
+- **Plan**: goal, how the plan works, workout editor (exercises, sets, reps, type, form tips), units, rest times, cycle controls, backup, and trainer notes.
+
+Data stays in your browser (localStorage). Use **Export backup** from time to time.
 
 ## Run it
 
