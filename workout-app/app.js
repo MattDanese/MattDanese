@@ -820,7 +820,7 @@
       <p class="muted small" style="margin-top:0">Your data is saved only in this browser on this device. Export a backup regularly, especially before clearing browser data or switching phones.</p>
       <div class="row wrap" style="margin-top:8px">
         <button class="btn ghost sm" data-act="export">Export backup</button>
-        <label class="btn ghost sm">Import backup<input type="file" accept="application/json" id="import-file" hidden></label>
+        <label class="btn ghost sm">Import backup (adds, never deletes)<input type="file" accept="application/json" id="import-file" hidden></label>
         <button class="btn danger sm" data-act="reset-program">Reset plan to default</button>
       </div>
     </div>`;
@@ -1168,22 +1168,60 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
+  /**
+   * Merge a backup into the current data. Nothing already in the app is removed:
+   * workouts, weigh-ins and cardio not yet present are added. Backups from older plan
+   * versions keep the current plan (the logged workouts still count toward this week).
+   */
+  function mergeBackup(data) {
+    const key = (s) => `${s.date}|${s.dayName}`;
+    const haveIds = new Set(state.sessions.map((s) => s.id));
+    const haveKeys = new Set(state.sessions.map(key));
+    const sessions = data.sessions.filter((s) => s && s.date && Array.isArray(s.exercises) && !haveIds.has(s.id) && !haveKeys.has(key(s)));
+    const bwDates = new Set(state.bodyweight.map((x) => x.date));
+    const bodyweight = (data.bodyweight || []).filter((x) => x && x.date && !bwDates.has(x.date));
+    const cardioIds = new Set(state.cardio.map((x) => x.id));
+    const cardio = (data.cardio || []).filter((x) => x && !cardioIds.has(x.id));
+    return { sessions, bodyweight, cardio };
+  }
+
   function importFile(file) {
     const r = new FileReader();
     r.onload = () => {
+      let data;
       try {
-        const data = JSON.parse(r.result);
+        data = JSON.parse(r.result);
         if (!data.program || !Array.isArray(data.sessions)) throw new Error('bad file');
-        if (!confirm(`Replace current data with this backup (${data.sessions.length} workouts)?`)) return;
-        const fresh = freshState();
-        state = Object.assign(fresh, data);
-        state.settings = Object.assign(fresh.settings, data.settings, { onboarded: true });
-        save();
-        toast('Backup restored');
-        render();
       } catch (e) {
         toast("That file doesn't look like an M-F Lift backup.");
+        return;
       }
+      const add = mergeBackup(data);
+      const n = add.sessions.length;
+      if (!n && !add.bodyweight.length && !add.cardio.length) {
+        toast('Everything in that backup is already in the app.');
+        return;
+      }
+      const list = add.sessions.map((s) => `• ${prettyDate(s.date)}: ${s.dayName}`).join('\n');
+      if (!confirm(`Add ${n} workout${n === 1 ? '' : 's'} from this backup?\n${list}\n\nNothing already in the app will be removed.`)) return;
+      const wasEmpty = !state.sessions.length;
+      state.sessions.push(...add.sessions);
+      state.sessions.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      state.bodyweight.push(...add.bodyweight);
+      state.cardio.push(...add.cardio);
+      const ds = data.settings || {};
+      // Keep the earlier cycle start so the 6-week cycle continues where it was.
+      if (ds.blockStart && (!state.settings.blockStart || ds.blockStart < state.settings.blockStart)) state.settings.blockStart = ds.blockStart;
+      if (wasEmpty && ds.unit) state.settings.unit = ds.unit;
+      if (!state.settings.goal && ds.goal) state.settings.goal = ds.goal;
+      state.settings.onboarded = true;
+      // A backup with an up-to-date plan you customised replaces the plan only when the app had nothing logged.
+      if (wasEmpty && (data.program.version || 1) >= window.PROGRAM_VERSION) state.program = data.program;
+      else if ((data.program.version || 1) < window.PROGRAM_VERSION && !state.previousProgram) state.previousProgram = data.program;
+      ui.todayDay = null;
+      save();
+      toast(`Added ${n} workout${n === 1 ? '' : 's'} ✓`);
+      render();
     };
     r.readAsText(file);
   }
