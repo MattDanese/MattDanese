@@ -46,12 +46,17 @@
     progressEx: null,
     programDay: '1',
     offerUpgrade: false,
+    migrated: false,
   };
 
-  // Upgrade older saved programs to the current trainer program.
+  // Move older saved plans to the current one. Logged workouts are never touched; the old plan is kept as a backup.
   if ((state.program.version || 1) < window.PROGRAM_VERSION) {
-    if (!state.sessions.length) state.program = freshProgram();
-    else ui.offerUpgrade = true;
+    if (state.sessions.length) {
+      state.previousProgram = state.program;
+      ui.migrated = true;
+    }
+    state.program = freshProgram();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* saved on next change */ }
   }
 
   function save() {
@@ -285,39 +290,72 @@
     return i === -1 ? null : i;
   }
 
+  function dayKeys() {
+    return L.orderedKeys(state.program);
+  }
+  const usualLabel = (day) => (day && day.usual ? `usually ${DOW_LONG[day.usual]}` : 'any day');
+
   function weekStatus() {
     const d = today();
     const ws = L.weekStart(d);
     const wk = sessionsInWeek(ws);
     const doneBy = {};
-    for (const s of wk) if (s.completedAt) doneBy[s.dayKey] = s;
-    const partial = new Set(wk.filter((s) => !s.completedAt).map((s) => Number(s.dayKey)));
-    return { ws, doneBy, partial };
+    for (const s of wk) if (s.completedAt && state.program.days[s.dayKey]) doneBy[s.dayKey] = s;
+    const keys = dayKeys();
+    const doneCount = keys.filter((k) => doneBy[k]).length;
+    return { ws, doneBy, keys, doneCount, total: keys.length };
   }
 
-  function stripHtml(selKey) {
-    const d = today();
+  /** Unfinished workouts from an earlier day (e.g. forgot to tap Finish). */
+  function staleSessions() {
+    const t = todayStr();
+    return state.sessions.filter((s) => !s.completedAt && s.date < t);
+  }
+
+  /** Which workout the Workout tab shows: your pick, else today's session, else the next one in the rotation. */
+  function selection() {
+    const date = todayStr();
+    const ws = weekStatus();
+    const next = L.nextWorkout(state.program, Object.keys(ws.doneBy));
+    let key = ui.todayDay != null && state.program.days[ui.todayDay] ? String(ui.todayDay) : null;
+    if (key == null) {
+      const todays = state.sessions.filter((s) => s.date === date && state.program.days[s.dayKey]);
+      const pick = todays.find((s) => !s.completedAt) || todays[todays.length - 1];
+      if (pick) key = String(pick.dayKey);
+    }
+    if (key == null) key = next;
+    return { key, next, ...ws };
+  }
+
+  function stripHtml() {
     const ts = todayStr();
-    const { ws, doneBy, partial } = weekStatus();
-    let h = `<div class="strip" role="tablist" aria-label="Choose a workout day">`;
+    const { ws } = weekStatus();
+    let h = `<div class="strip" aria-label="This week">`;
     for (let i = 1; i <= 7; i++) {
       const dd = L.addDays(ws, i - 1);
       const ds = L.ymd(dd);
-      const train = i <= 5;
-      let cls = train ? '' : 'rest';
+      const trained = state.sessions.some((s) => s.date === ds && s.completedAt);
+      const partial = !trained && state.sessions.some((s) => s.date === ds);
+      let cls = 'rest';
       let mark = '';
-      if (train && doneBy[i]) { cls += ' done'; mark = '✓'; }
-      else if (train && partial.has(i)) { cls += ' partial'; mark = '•'; }
-      else if (train && ds < ts) { cls += ' missed'; mark = '✕'; }
-      if (!train) mark = '–';
+      if (trained) { cls = 'done'; mark = '✓'; }
+      else if (partial) { cls = 'partial'; mark = '•'; }
       if (ds === ts) cls += ' today';
-      if (train && String(i) === String(selKey)) cls += ' sel';
-      h += train
-        ? `<button class="sd ${cls}" data-act="pick-day" data-day="${i}" aria-label="${DOW_LONG[i]}: ${esc(state.program.days[i].name)}">${DOW[i]}<span class="n">${dd.getDate()}</span><span class="st">${mark}</span></button>`
-        : `<div class="sd ${cls}">${DOW[i]}<span class="n">${dd.getDate()}</span><span class="st">${mark}</span></div>`;
+      h += `<div class="sd ${cls}">${DOW[i]}<span class="n">${dd.getDate()}</span><span class="st">${mark}</span></div>`;
     }
-    void d;
     return h + `</div>`;
+  }
+
+  function workoutChips(sel, doneBy) {
+    return `<div class="chips" style="margin:0 0 12px" role="tablist" aria-label="Choose a workout">${dayKeys().map((k) => {
+      const done = doneBy[k];
+      return `<button class="chip ${String(k) === String(sel) ? 'on' : ''}" data-act="pick-day" data-day="${k}">${done ? '✓ ' : ''}${esc(state.program.days[k].name)}</button>`;
+    }).join('')}</div>`;
+  }
+
+  function staleBanner() {
+    return staleSessions().map((s) => `<div class="banner warn"><span class="bi">⏸</span><div><strong>Unfinished: ${esc(s.dayName)} from ${esc(prettyDate(s.date))}</strong>${L.sessionSetCount(s)} sets logged. Save it to keep it in your history and your week.
+      <div class="row" style="margin-top:8px"><button class="btn sm" data-act="finish-stale" data-id="${s.id}">Save as done</button><button class="btn ghost sm" data-act="delete-stale" data-id="${s.id}">Delete</button></div></div></div>`).join('');
   }
 
   function blockBanner() {
@@ -332,49 +370,44 @@
     const d = today();
     const dow = L.isoDow(d);
     const date = todayStr();
-    const scheduled = dow <= 5 ? dow : null;
-    const dayKey = ui.todayDay ?? scheduled;
-    const { doneBy } = weekStatus();
-    const missed = [1, 2, 3, 4, 5].filter((k) => k < (scheduled ?? 6) && !doneBy[k]);
+    const { key: dayKey, next, doneBy, doneCount, total } = selection();
     const b = block();
 
-    let html = stripHtml(dayKey);
+    let html = stripHtml() + (ui.migrated ? migratedBanner() : '') + staleBanner();
 
     if (dayKey == null) {
-      html += `<div class="card hero"><div class="eyebrow">${DOW_LONG[dow]}</div><h1>Rest day</h1>
-        <p class="muted">Muscle grows while you recover. Eat your protein, sleep 7–9 hours and get your steps in.</p>
-        <div class="meta"><span class="pill accent">Cycle week ${b.week} of ${b.total}</span><span class="pill">${fmt(L.GOALS[goal()].steps)} steps</span></div></div>`;
-      if (missed.length) {
-        html += `<div class="card"><h3>Make up a missed workout?</h3><p class="muted small">Optional. One missed day won't hurt your progress.</p>
-          <div class="row wrap" style="margin-top:10px">${missed.map((k) => `<button class="btn outline sm" data-act="pick-day" data-day="${k}">${DOW[k]} · ${esc(state.program.days[k].name)}</button>`).join('')}</div></div>`;
-      }
+      html += `<div class="card hero"><div class="eyebrow">${DOW_LONG[dow]} · ${doneCount}/${total} done</div><h1>Week complete 🎉</h1>
+        <p class="muted">All ${total} workouts are done. Muscle grows while you recover, so eat your protein, sleep 7–9 hours and get your steps in.</p>
+        <div class="meta"><span class="pill accent">Cycle week ${b.week} of ${b.total}</span><span class="pill">${fmt(L.GOALS[goal()].steps)} steps a day</span></div></div>
+        <div class="card"><h3>Feeling good?</h3><p class="muted small">An extra session is optional. Pick the one you want to bring up most.</p>
+        <div class="row wrap" style="margin-top:10px">${dayKeys().map((k) => `<button class="btn outline sm" data-act="pick-day" data-day="${k}">${esc(state.program.days[k].name)}</button>`).join('')}</div></div>`;
       html += cardioCard(date);
       $('#view').innerHTML = html;
       return;
     }
 
+    html += workoutChips(dayKey, doneBy);
     const day = state.program.days[dayKey];
     const session = findSession(date, dayKey);
 
     if (!session) {
       html += blockBanner();
-      const offPlan = scheduled !== Number(dayKey);
+      const isNext = String(dayKey) === String(next);
       const doneEarlier = doneBy[dayKey];
       if (doneEarlier) {
-        html += `<div class="banner good"><span class="bi">✓</span><div><strong>You already did ${esc(day.name)} on ${esc(prettyDate(doneEarlier.date))}</strong>Pick another day above, or repeat it if you want to.</div></div>`;
-      } else if (!offPlan && missed.length) {
-        html += `<div class="banner warn"><span class="bi">↺</span><div><strong>You missed ${missed.map((k) => DOW[k]).join(' & ')}</strong>Do today's workout as planned and make it up at the weekend if you can. Tap the day above to do it now instead.</div></div>`;
+        html += `<div class="banner good"><span class="bi">✓</span><div><strong>You already did ${esc(day.name)} on ${esc(prettyDate(doneEarlier.date))}</strong>${next ? `Next up is ${esc(state.program.days[next].name)}. You can still repeat this one if you want.` : 'You can repeat it as a bonus session.'}</div></div>`;
       }
       if (day.exercises.every((e) => !L.lastLogFor(state.sessions, e.name, date))) {
         html += `<div class="banner"><span class="bi">🧭</span><div><strong>First time doing this workout</strong>Pick weights you could lift for 1–2 more reps than the target. The app remembers them and tells you when to go heavier.</div></div>`;
       }
       const sets = day.exercises.reduce((a, e) => a + (b.deload ? L.deloadSets(e.sets) : Number(e.sets)), 0);
       const mins = L.estimateMinutes(day.exercises.map((e) => ({ ...e, sets: b.deload ? L.deloadSets(e.sets) : e.sets })), state.settings);
+      const eyebrow = isNext ? `Up next · workout ${doneCount + 1} of ${total} this week` : `Workout · ${usualLabel(day)}`;
       html += `<div class="card hero">
-        <div class="eyebrow">${DOW_LONG[dayKey]}${offPlan ? ' · doing it today' : ''}</div>
+        <div class="eyebrow">${esc(eyebrow)}</div>
         <h1>${esc(day.name)}</h1>
         ${day.focus ? `<div class="muted">${esc(day.focus)}</div>` : ''}
-        <div class="meta"><span class="pill">${day.exercises.length} exercises</span><span class="pill">${sets} sets</span><span class="pill">≈ ${mins} min</span><span class="pill accent">Week ${b.week}/${b.total}</span></div>
+        <div class="meta"><span class="pill">${day.exercises.length} exercises</span><span class="pill">${sets} sets</span><span class="pill">≈ ${mins} min</span><span class="pill accent">Cycle wk ${b.week}/${b.total}</span></div>
         <ul class="plan-list">${day.exercises.map((e, i) => {
           const sg = suggestionFor(e, date, b.deload);
           const n = b.deload ? L.deloadSets(e.sets) : e.sets;
@@ -383,15 +416,19 @@
         }).join('')}</ul>
       </div>
       <button class="btn lg block" data-act="start" data-day="${dayKey}">Start workout</button>
-      <p class="muted small" style="text-align:center;margin-top:10px">The app tells you the weight and reps for every set as you go.</p>`;
+      <p class="muted small" style="text-align:center;margin-top:10px">Train on whichever days work for you. The app just keeps your 3 workouts in order.</p>`;
       $('#view').innerHTML = html;
       return;
     }
 
     if (session.completedAt) {
       html += summaryCard(session);
-      const next = [1, 2, 3, 4, 5].find((k) => k > Number(dayKey) && !doneBy[k]);
-      if (next) html += `<div class="card row"><span class="idx">${DOW[next][0]}</span><div class="grow"><div class="tiny muted">Up next · ${DOW_LONG[next]}</div><div style="font-weight:700">${esc(state.program.days[next].name)}</div></div></div>`;
+      if (next) {
+        const nd = state.program.days[next];
+        html += `<div class="card row"><span class="idx">${doneCount + 1}</span><div class="grow"><div class="tiny muted">Up next · whenever you're back</div><div style="font-weight:700">${esc(nd.name)}</div></div><span class="small muted">${doneCount}/${total} done</span></div>`;
+      } else {
+        html += `<div class="banner good"><span class="bi">🎉</span><div><strong>That's all ${total} workouts this week</strong>Recover well and keep your steps up.</div></div>`;
+      }
       html += cardioCard(date);
       html += `<button class="btn outline block" data-act="reopen" data-id="${session.id}">Edit this workout</button>`;
       $('#view').innerHTML = html;
@@ -523,7 +560,7 @@
   function renderWeek() {
     const d = today();
     const ts = todayStr();
-    const { ws, doneBy, partial } = weekStatus();
+    const { ws, doneBy, keys, total } = weekStatus();
     const b = block();
     const lastWk = sessionsInWeek(L.addDays(ws, -7)).filter((s) => s.completedAt);
     const done = Object.values(doneBy);
@@ -538,36 +575,37 @@
       <p class="muted small" style="margin-bottom:0">${b.deload ? 'Lighter week: fewer sets and easier effort. Your recovery catches up so next cycle starts stronger.' : `Push to add weight or reps every week. Week 6 is a lighter deload week, ${b.total - b.week} week${b.total - b.week === 1 ? '' : 's'} away.`}</p>
     </div>`;
 
-    // days
+    // workouts this week
+    const daysLeft = 8 - L.isoDow(d); // including today
+    const remaining = keys.filter((k) => !doneBy[k]);
+    const nextKey = remaining[0];
     html += `<div class="card flush"><ul class="day-list">`;
-    for (let i = 1; i <= 7; i++) {
-      const ds = L.ymd(L.addDays(ws, i - 1));
-      const train = i <= 5;
-      const s = doneBy[i];
+    keys.forEach((k, i) => {
+      const day = state.program.days[k];
+      const s = doneBy[k];
+      const inProg = !s && sessionsInWeek(ws).some((x) => String(x.dayKey) === String(k) && !x.completedAt);
       let cls = '', sub = '';
-      if (train) {
-        const day = state.program.days[i];
-        if (s) { cls = 'done'; sub = `${L.sessionSetCount(s)} sets · ${fmt(L.sessionVolume(s))} ${unit()}`; }
-        else if (partial.has(i)) { cls = 'partial'; sub = 'In progress'; }
-        else if (ds < ts) { cls = 'missed'; sub = 'Missed. Make it up on the weekend if you can.'; }
-        else { const lead = day.exercises[0]; sub = lead ? `Starts with ${lead.name} ${lead.sets} × ${repText(lead)}` : ''; }
-        html += `<li class="${ds === ts ? 'is-today' : ''}"><span class="dl-badge ${cls}">${s ? '✓' : DOW[i].slice(0, 2)}</span><div class="grow"><div style="font-weight:700">${DOW[i]} · ${esc(day.name)}</div><div class="small muted">${esc(sub)}</div></div></li>`;
-      } else {
-        const cm = state.cardio.filter((c) => c.date === ds).reduce((a, c) => a + Number(c.minutes || 0), 0);
-        html += `<li class="${ds === ts ? 'is-today' : ''}"><span class="dl-badge ${cm ? 'done' : ''}">${DOW[i].slice(0, 2)}</span><div class="grow"><div style="font-weight:700">${DOW[i]} · Rest</div><div class="small muted">${cm ? `${cm} min cardio` : 'Recover · steps · optional cardio'}</div></div></li>`;
-      }
-    }
+      if (s) { cls = 'done'; sub = `Done ${prettyDate(s.date)} · ${L.sessionSetCount(s)} sets · ${fmt(L.sessionVolume(s))} ${unit()}`; }
+      else if (inProg) { cls = 'partial'; sub = 'In progress'; }
+      else { const lead = day.exercises[0]; sub = `${String(k) === String(nextKey) ? 'Up next' : 'To do'} · ${usualLabel(day)}${lead ? ` · starts with ${lead.name}` : ''}`; }
+      html += `<li class="${!s && String(k) === String(nextKey) ? 'is-today' : ''}"><span class="dl-badge ${cls}">${s ? '✓' : i + 1}</span><div class="grow"><div style="font-weight:700">${esc(day.name)}</div><div class="small muted">${esc(sub)}</div></div></li>`;
+    });
     html += `</ul></div>`;
+    if (remaining.length && remaining.length > daysLeft) {
+      html += `<div class="banner warn"><span class="bi">⏳</span><div><strong>${remaining.length} workouts left, ${daysLeft} day${daysLeft === 1 ? '' : 's'} left this week</strong>Do the next one in line. Whatever you miss simply waits for next week, so nothing breaks.</div></div>`;
+    } else if (!remaining.length) {
+      html += `<div class="banner good"><span class="bi">🎉</span><div><strong>All ${total} workouts done this week</strong>Nice work. Recovery, steps and protein are your job until Monday.</div></div>`;
+    }
 
     // stats
     const vol = done.reduce((a, s) => a + L.sessionVolume(s), 0);
     const lastVol = lastWk.reduce((a, s) => a + L.sessionVolume(s), 0);
     const sets = done.reduce((a, s) => a + L.sessionSetCount(s), 0);
-    const streak = L.weekStreak(state.sessions, d);
+    const streak = L.weekStreak(state.sessions, d, keys);
     const delta = lastVol && vol ? Math.round(((vol - lastVol) / lastVol) * 100) : null;
     const cardioMin = cardioInWeek(ws);
     html += `<div class="stats">
-      <div class="stat"><div class="v">${done.length}<span class="muted" style="font-size:16px">/5</span></div><div class="l">workouts</div></div>
+      <div class="stat"><div class="v">${done.length}<span class="muted" style="font-size:16px">/${total}</span></div><div class="l">workouts</div></div>
       <div class="stat"><div class="v">${streak}</div><div class="l">full-week streak 🔥</div></div>
       <div class="stat"><div class="v">${vol >= 10000 ? fmt(vol / 1000, 1) + 'k' : fmt(vol)}</div><div class="l">${unit()} lifted ${delta != null ? `<span class="${delta >= 0 ? 'good-t' : 'bad-t'}">${delta >= 0 ? '▲' : '▼'}${Math.abs(delta)}%</span>` : ''}</div></div>
       <div class="stat"><div class="v">${cardioMin}<span class="muted" style="font-size:16px">/${g.cardio}</span></div><div class="l">cardio min</div></div>
@@ -575,7 +613,7 @@
 
     // nutrition targets
     const bw = latestBw();
-    const n = bw ? L.nutrition(Number(bw.weight), unit(), goal()) : null;
+    const n = bw ? L.nutrition(Number(bw.weight), unit(), goal(), total) : null;
     html += `<h2>Daily targets · ${esc(g.label)}</h2>`;
     if (n) {
       html += `<div class="card">
@@ -649,7 +687,7 @@
     const done = state.sessions.filter((s) => s.completedAt);
     const names = [];
     const seen = new Set();
-    for (const k of [1, 2, 3, 4, 5]) for (const e of state.program.days[k].exercises) {
+    for (const k of dayKeys()) for (const e of state.program.days[k].exercises) {
       if (!seen.has(e.name.toLowerCase())) { seen.add(e.name.toLowerCase()); names.push(e.name); }
     }
     for (const s of done) for (const e of s.exercises) if (!seen.has(e.name.toLowerCase())) { seen.add(e.name.toLowerCase()); names.push(e.name); }
@@ -659,12 +697,12 @@
 
     // Main lifts
     const prRows = [];
-    for (const k of [1, 2, 3, 4, 5]) {
+    for (const k of dayKeys()) {
       const main = state.program.days[k].exercises[0];
       if (!main) continue;
       const h = L.exerciseHistory(state.sessions, main.name);
       if (!h.length) {
-        prRows.push(`<li class="row between"><div><strong>${esc(main.name)}</strong><div class="muted small">${DOW[k]} · not logged yet</div></div><span class="muted">–</span></li>`);
+        prRows.push(`<li class="row between"><div><strong>${esc(main.name)}</strong><div class="muted small">${esc(state.program.days[k].name)} · not logged yet</div></div><span class="muted">–</span></li>`);
         continue;
       }
       const best = h.reduce((a, b) => (b.e1rm > a.e1rm ? b : a));
@@ -700,41 +738,48 @@
           return `<li class="small"><strong>${esc(e.name)}</strong><div class="muted num">${cs.length ? cs.map((x) => `${x.weight ? x.weight + '×' : ''}${x.reps}`).join(' · ') : 'skipped'}</div></li>`;
         }).join('')}</ul>
         ${s.notes ? `<p class="muted small">“${esc(s.notes)}”</p>` : ''}
-        <button class="btn danger sm" data-act="delete-session" data-id="${s.id}">Delete workout</button>
+        <div class="row between" style="margin-top:10px"><label class="field" style="flex-direction:row;align-items:center;gap:8px">Date<input type="date" class="input" style="width:auto;min-height:36px;padding:4px 8px" data-f="session-date" data-id="${s.id}" value="${s.date}"></label>
+        <button class="btn danger sm" data-act="delete-session" data-id="${s.id}">Delete</button></div>
       </details>`;
     }
     $('#view').innerHTML = html;
   }
 
   // ---------- PLAN ----------
+  function migratedBanner() {
+    return `<div class="banner good"><span class="bi">✨</span><div><strong>Switched to your 3-day plan</strong>${dayKeys().map((x) => esc(state.program.days[x].name)).join(' → ')}. All ${state.sessions.filter((x) => x.completedAt).length} logged workouts are kept, and this week's count toward your 3.
+      <div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="dismiss-migrated">Got it</button></div></div></div>`;
+  }
+
   function renderProgram() {
+    if (!state.program.days[ui.programDay]) ui.programDay = dayKeys()[0];
     const k = ui.programDay;
     const day = state.program.days[k];
     const b = block();
     const s = state.settings;
     let html = `<div class="eyebrow">${esc(state.program.name)}</div><h1>Your plan</h1>`;
 
-    if (ui.offerUpgrade) {
-      html += `<div class="banner good"><span class="bi">✨</span><div><strong>Upgraded trainer program available</strong>Trains each muscle twice a week, uses rep ranges on the main lifts, and adds form tips and deload weeks. Your workout history is kept.
-        <div class="row" style="margin-top:8px"><button class="btn sm" data-act="upgrade">Switch to it</button><button class="btn ghost sm" data-act="dismiss-upgrade">Not now</button></div></div></div>`;
-    }
+    if (ui.migrated) html += migratedBanner();
 
     // goal
     html += `<h2>Goal</h2>` + GOAL_CHOICES.map(([key, i, t, d]) => `<button class="choice ${goal() === key ? 'on' : ''}" data-act="set-goal" data-goal="${key}"><span class="ci">${i}</span><span><b>${t}</b><span>${d}</span></span></button>`).join('');
 
     // how the plan works
     html += `<h2>How this plan works</h2><div class="card stack small">
-      <div class="row top"><span class="idx">1</span><div><strong>Mon–Fri, one focus per day.</strong> Back, Chest, Legs, Shoulders, Arms. Chest, back and calves get a second, lighter session later in the week, which builds more muscle than training them once.</div></div>
+      <div class="row top"><span class="idx">1</span><div><strong>${dayKeys().length} workouts a week, on any days.</strong> ${dayKeys().map((x) => esc(state.program.days[x].name)).join(', then ')}. Go Mon/Tue/Wed or Mon/Thu/Sat: the Workout tab always gives you the next one you haven't done this week. Anything missed waits for next week.</div></div>
       <div class="row top"><span class="idx">2</span><div><strong>Add weight or reps every week.</strong> Hit the top of the rep range on every set and the app adds weight next time. Otherwise it keeps the weight and you aim for more reps.</div></div>
-      <div class="row top"><span class="idx">3</span><div><strong>Train hard, but not to failure on big lifts.</strong> Stop 1–2 reps short on presses, squats and deadlifts. Take the last set of accessory exercises to failure.</div></div>
+      <div class="row top"><span class="idx">3</span><div><strong>Make every set count.</strong> Each muscle is trained once a week, so each session has 9–12 hard sets for the big muscles. Stop 1–2 reps short on presses, squats and deadlifts; take the last set of accessory exercises to failure.</div></div>
       <div class="row top"><span class="idx">4</span><div><strong>6-week cycles.</strong> 5 weeks building, then 1 lighter deload week. You're in week ${b.week} of cycle ${b.block}.</div></div>
     </div>`;
 
     // editor
-    html += `<h2>Edit workouts</h2><div class="chips" style="margin:0 0 10px">${[1, 2, 3, 4, 5].map((d) => `<button class="chip ${String(d) === String(k) ? 'on' : ''}" data-act="prog-day" data-day="${d}">${DOW[d]} · ${esc(state.program.days[d].name)}</button>`).join('')}</div>`;
-    html += `<div class="card"><div class="grid-ex" style="grid-template-columns:1fr 1.6fr;margin:0">
-      <label class="field">Day name<input data-f="day-name" value="${esc(day.name)}"></label>
-      <label class="field">Focus<input data-f="day-focus" value="${esc(day.focus || '')}"></label></div></div>`;
+    html += `<h2>Edit workouts</h2><div class="chips" style="margin:0 0 10px">${dayKeys().map((d) => `<button class="chip ${String(d) === String(k) ? 'on' : ''}" data-act="prog-day" data-day="${d}">${esc(state.program.days[d].name)}</button>`).join('')}<button class="chip" data-act="add-day">+ Workout</button></div>`;
+    html += `<div class="card"><div class="grid-ex" style="grid-template-columns:1.3fr 1fr;margin:0">
+      <label class="field">Workout name<input data-f="day-name" value="${esc(day.name)}"></label>
+      <label class="field">Usual day<select data-f="day-usual">${[[0, 'Any day'], ...[1, 2, 3, 4, 5, 6, 7].map((i) => [i, DOW_LONG[i]])].map(([v, l]) => `<option value="${v}" ${Number(day.usual || 0) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+      <label class="field" style="margin-top:8px">Focus<input data-f="day-focus" value="${esc(day.focus || '')}"></label>
+      <p class="muted small" style="margin-bottom:0">The usual day only sets the order. You can still do any workout on any day.</p>
+      ${dayKeys().length > 1 ? `<div style="text-align:right"><button class="link small" style="color:var(--bad)" data-act="rm-day">Remove this workout</button></div>` : ''}</div>`;
     day.exercises.forEach((e, i) => {
       html += `<details class="card"><summary><span class="row" style="gap:10px"><span class="idx">${i + 1}</span><span><span>${esc(e.name)}</span><div class="small muted" style="font-weight:500">${e.sets} × ${repText(e)} · ${KIND_LABEL[e.kind] || ''}${e.muscle ? ' · ' + esc(e.muscle) : ''}</div></span></span></summary>
         <div style="margin-top:12px">
@@ -817,8 +862,7 @@
   const view = $('#view');
 
   function currentSession() {
-    const dow = L.isoDow(today());
-    const key = ui.todayDay ?? (dow <= 5 ? dow : null);
+    const { key } = selection();
     return key == null ? null : findSession(todayStr(), key);
   }
 
@@ -835,6 +879,12 @@
     } else if (t.dataset.f === 'day-name') {
       state.program.days[ui.programDay].name = t.value;
       save();
+    } else if (t.dataset.f === 'day-usual') {
+      state.program.days[ui.programDay].usual = Number(t.value) || null;
+      save();
+    } else if (t.dataset.f === 'session-date') {
+      const sess = state.sessions.find((x) => x.id === t.dataset.id);
+      if (sess && /^\d{4}-\d{2}-\d{2}$/.test(t.value)) { sess.date = t.value; save(); }
     } else if (t.dataset.f === 'day-focus') {
       state.program.days[ui.programDay].focus = t.value;
       save();
@@ -854,6 +904,7 @@
   view.addEventListener('change', (ev) => {
     const t = ev.target;
     if (t.dataset.f === 'progress-ex') { ui.progressEx = t.value; render(); }
+    if (t.dataset.f === 'day-usual' || t.dataset.f === 'session-date') { render(); toast(t.dataset.f === 'session-date' ? 'Workout date changed' : 'Order updated'); }
     if (t.id === 'import-file' && t.files[0]) importFile(t.files[0]);
   });
 
@@ -1021,6 +1072,35 @@
         state.settings.blockStart = L.ymd(L.addDays(L.weekStart(today()), -7 * (L.BLOCK_WEEKS - 1)));
         save();
         break;
+      case 'finish-stale': {
+        const sess = state.sessions.find((x) => x.id === b.dataset.id);
+        sess.completedAt = sess.startedAt || Date.now();
+        save();
+        toast(`${sess.dayName} saved`);
+        break;
+      }
+      case 'delete-stale':
+        if (!confirm('Delete this unfinished workout and its logged sets?')) return;
+        state.sessions = state.sessions.filter((x) => x.id !== b.dataset.id);
+        save();
+        break;
+      case 'dismiss-migrated':
+        ui.migrated = false;
+        break;
+      case 'add-day': {
+        const keys = Object.keys(state.program.days).map(Number);
+        const nk = String(Math.max(0, ...keys) + 1);
+        state.program.days[nk] = { name: 'New workout', usual: null, focus: '', exercises: [] };
+        ui.programDay = nk;
+        save();
+        break;
+      }
+      case 'rm-day':
+        if (!confirm(`Remove the ${state.program.days[ui.programDay].name} workout? Workouts you already logged stay in your history.`)) return;
+        delete state.program.days[ui.programDay];
+        ui.programDay = dayKeys()[0];
+        save();
+        break;
       case 'upgrade':
         state.program = freshProgram();
         ui.offerUpgrade = false;
@@ -1055,7 +1135,7 @@
         save();
         break;
       case 'reset-program':
-        if (!confirm('Reset all five days to the default plan? Your logged workouts are kept.')) return;
+        if (!confirm('Reset to the default 3-day plan? Your logged workouts are kept.')) return;
         state.program = freshProgram();
         ui.offerUpgrade = false;
         save();
@@ -1110,10 +1190,12 @@
 
   // ---------- render ----------
   function render() {
-    const { doneBy } = weekStatus();
+    const { doneCount, total } = weekStatus();
     const b = block();
-    $('#topbar-meta').innerHTML = `${Object.keys(doneBy).length}/5 this week<br><span style="font-weight:500">${b.deload ? 'Deload week' : `Cycle wk ${b.week}/${b.total}`}</span>`;
+    $('#topbar-meta').innerHTML = `${doneCount}/${total} this week<br><span style="font-weight:500">${b.deload ? 'Deload week' : `Cycle wk ${b.week}/${b.total}`}</span>`;
     ({ today: renderToday, week: renderWeek, progress: renderProgress, program: renderProgram })[ui.tab]();
+    const on = document.querySelector('#view .chips .chip.on');
+    if (on) on.parentElement.scrollLeft = on.offsetLeft - (on.parentElement.clientWidth - on.offsetWidth) / 2;
   }
 
   render();

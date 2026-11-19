@@ -1,5 +1,5 @@
-// Offline cache: serve app files from the cache, refreshing them in the background.
-const CACHE = 'mf-lift-v2';
+// Network first so updates show up right away when online; cached copy when offline (e.g. in the gym basement).
+const CACHE = 'mf-lift-v3';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'logic.js', 'program.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -11,19 +11,16 @@ self.addEventListener('activate', (e) => {
   );
 });
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      const network = fetch(e.request)
-        .then((res) => {
-          if (res.ok && new URL(e.request.url).origin === location.origin) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(e.request, { cache: 'no-cache' })
+      .then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match('index.html')))
   );
 });

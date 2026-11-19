@@ -11,13 +11,15 @@ const sess = (date, name, sets, extra = {}) => ({
 const deadlift = { name: 'Deadlift', sets: 4, repMin: 6, repMax: 6, kind: 'lower' };
 const pulldown = { name: 'Lat Pulldown', sets: 4, repMin: 8, repMax: 12, kind: 'iso' };
 
-test('default program keeps the M-F split and lead lifts', () => {
-  assert.deepEqual(Object.keys(DEFAULT_PROGRAM.days), ['1', '2', '3', '4', '5']);
-  const leads = [1, 2, 3, 4, 5].map((d) => DEFAULT_PROGRAM.days[d].exercises[0].name);
-  assert.deepEqual(leads, ['Deadlift', 'Incline Bench Press', 'Barbell Back Squat', 'Military Press', 'Chin-Up']);
+test('default program is 3 workouts: Back & Biceps, Chest & Triceps, Legs & Abs (Mon/Tue/Wed)', () => {
+  assert.deepEqual(L.orderedKeys(DEFAULT_PROGRAM), ['1', '2', '3']);
+  assert.deepEqual(['1', '2', '3'].map((k) => DEFAULT_PROGRAM.days[k].name), ['Back & Biceps', 'Chest & Triceps', 'Legs & Abs']);
+  assert.deepEqual(['1', '2', '3'].map((k) => DEFAULT_PROGRAM.days[k].usual), [1, 2, 3]);
+  const leads = ['1', '2', '3'].map((d) => DEFAULT_PROGRAM.days[d].exercises[0].name);
+  assert.deepEqual(leads, ['Deadlift', 'Incline Bench Press', 'Barbell Back Squat']);
 });
 
-test('every exercise has a muscle, cue and valid rep range; sessions stay ~60 min', () => {
+test('every exercise has a muscle, cue and valid rep range; sessions stay ~60–70 min', () => {
   for (const day of Object.values(DEFAULT_PROGRAM.days)) {
     let sets = 0;
     for (const e of day.exercises) {
@@ -25,18 +27,26 @@ test('every exercise has a muscle, cue and valid rep range; sessions stay ~60 mi
       assert.ok(e.repMax == null || e.repMax >= e.repMin, e.name);
       sets += e.sets;
     }
-    assert.ok(sets >= 16 && sets <= 22, `${day.name} has ${sets} sets`);
+    assert.ok(sets >= 18 && sets <= 22, `${day.name} has ${sets} sets`);
   }
 });
 
-test('chest, back and calves are trained at least twice a week; each major muscle gets 10+ sets', () => {
-  const days = {}, sets = {};
-  for (const [k, day] of Object.entries(DEFAULT_PROGRAM.days)) for (const e of day.exercises) {
-    (days[e.muscle] ||= new Set()).add(k);
-    sets[e.muscle] = (sets[e.muscle] || 0) + e.sets;
-  }
-  for (const m of ['Chest', 'Back', 'Calves']) assert.ok(days[m].size >= 2, m);
-  for (const m of ['Chest', 'Back']) assert.ok(sets[m] >= 10 && sets[m] <= 22, `${m} ${sets[m]}`);
+test('big muscles get enough weekly sets on 3 days', () => {
+  const sets = {};
+  for (const day of Object.values(DEFAULT_PROGRAM.days)) for (const e of day.exercises) sets[e.muscle] = (sets[e.muscle] || 0) + e.sets;
+  assert.ok(sets.Back >= 9, `Back ${sets.Back}`);
+  assert.ok(sets.Chest >= 9, `Chest ${sets.Chest}`);
+  assert.ok(sets.Quads + sets.Hamstrings >= 12);
+  for (const m of ['Biceps', 'Triceps', 'Shoulders', 'Side delts', 'Calves', 'Abs']) assert.ok(sets[m] >= 3, m);
+});
+
+test('flexible rotation: next workout is the first not done this week, any day', () => {
+  assert.equal(L.nextWorkout(DEFAULT_PROGRAM, []), '1');
+  assert.equal(L.nextWorkout(DEFAULT_PROGRAM, [1, 2]), '3');
+  assert.equal(L.nextWorkout(DEFAULT_PROGRAM, ['2']), '1');
+  assert.equal(L.nextWorkout(DEFAULT_PROGRAM, [1, 2, 3]), null);
+  const custom = { days: { 1: { usual: 4 }, 2: { usual: 1 }, 3: { usual: null } } };
+  assert.deepEqual(L.orderedKeys(custom), ['2', '1', '3']);
 });
 
 test('first session asks for a starting weight', () => {
@@ -104,6 +114,10 @@ test('e1rm and week streak', () => {
     mk('2026-11-09', 1),
   ];
   assert.equal(L.weekStreak(sessions, L.parseYmd('2026-11-10')), 2);
+  // 3-day plan: a week with workouts 1–3 on any days counts as complete
+  const three = [mk('2026-11-16', 1), mk('2026-11-17', 2), mk('2026-11-19', 3)];
+  assert.equal(L.weekStreak(three, L.parseYmd('2026-11-19'), ['1', '2', '3']), 1);
+  assert.equal(L.weekStreak(three.slice(0, 2), L.parseYmd('2026-11-19'), ['1', '2', '3']), 0);
 });
 
 test('exercise history picks best set per session', () => {
@@ -143,9 +157,10 @@ test('warm-ups ramp below working weight; none for light or accessory work', () 
 test('nutrition targets follow the goal', () => {
   const shred = L.nutrition(200, 'lb', 'shred');
   const build = L.nutrition(200, 'lb', 'build');
-  assert.equal(shred.maintenance, 3000);
-  assert.equal(shred.kcal, 2500);
-  assert.equal(build.kcal, 3250);
+  assert.equal(shred.maintenance, 2800);
+  assert.equal(shred.kcal, 2300);
+  assert.equal(build.kcal, 3050);
+  assert.equal(L.nutrition(200, 'lb', 'shred', 5).maintenance, 3000);
   assert.ok(shred.protein >= 200);
   assert.ok(Math.abs(shred.protein * 4 + shred.carbs * 4 + shred.fat * 9 - shred.kcal) < 10);
   assert.equal(L.nutrition(90.7, 'kg', 'recomp').kcal, L.nutrition(200, 'lb', 'recomp').kcal);
