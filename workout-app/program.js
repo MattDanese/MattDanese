@@ -1,7 +1,7 @@
 /*
  * Default program: 3 workouts a week, done in order on whichever days you make it to the gym.
  *   1. Back & Biceps     (usually Mon)
- *   2. Chest & Triceps   (usually Tue) — also covers shoulders
+ *   2. Chest & Triceps   (usually Tue) — flat bench + incline dumbbell press, also covers shoulders
  *   3. Legs & Abs        (usually Wed)
  * Lead lifts come from the Muscle & Strength M-F routine
  * (https://www.muscleandstrength.com/workouts/m-f-workout-routine).
@@ -21,7 +21,7 @@
 (function (root) {
   const ex = (name, sets, repMin, repMax, kind, muscle, cue) => ({ name, sets, repMin, repMax, kind, muscle, cue });
 
-  const PROGRAM_VERSION = 3;
+  const PROGRAM_VERSION = 4;
 
   const DEFAULT_PROGRAM = {
     name: '3-Day Split: Muscle & Shred',
@@ -44,9 +44,10 @@
       2: {
         name: 'Chest & Triceps',
         usual: 2,
-        focus: 'Upper chest priority, shoulders, triceps',
+        focus: 'Flat & incline pressing, shoulders, triceps',
         exercises: [
-          ex('Incline Bench Press', 4, 6, 8, 'upper', 'Chest', '30° bench, shoulder blades pinned, touch upper chest, press up and slightly back.'),
+          ex('Bench Press', 4, 6, 8, 'upper', 'Chest', 'Shoulder blades pinned, feet planted, slight arch. Lower to mid-chest, press up and slightly back. Leave 1–2 reps in the tank.'),
+          ex('Incline Dumbbell Press', 3, 8, 12, 'upper', 'Chest', '30° bench, deep stretch at the bottom, press up and slightly in. This is your upper-chest work.'),
           ex('Flat Dumbbell Press', 3, 8, 10, 'upper', 'Chest', 'Deep stretch at the bottom, elbows ~45°, press the dumbbells together.'),
           ex('Cable Fly', 2, 12, 15, 'iso', 'Chest', 'Slight elbow bend, hug a big tree, squeeze hands together for a second.'),
           ex('Military Press', 3, 6, 8, 'upper', 'Shoulders', 'Squeeze glutes, bar path close to the face, push your head through at the top.'),

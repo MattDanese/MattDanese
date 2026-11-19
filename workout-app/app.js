@@ -50,14 +50,30 @@
   };
 
   // Move older saved plans to the current one. Logged workouts are never touched; the old plan is kept as a backup.
-  if ((state.program.version || 1) < window.PROGRAM_VERSION) {
+  if ((state.program.version || 1) < 3) {
     if (state.sessions.length) {
       state.previousProgram = state.program;
       ui.migrated = true;
     }
     state.program = freshProgram();
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* saved on next change */ }
   }
+  // v3 → v4: flat Bench Press leads chest day, Incline Dumbbell Press added after it.
+  // Edits only that exercise so any other changes you made to your plan are kept.
+  if (state.program.version === 3) {
+    const tpl = Object.values(window.DEFAULT_PROGRAM.days).flatMap((d) => d.exercises);
+    const bench = tpl.find((e) => e.name === 'Bench Press');
+    const incline = tpl.find((e) => e.name === 'Incline Dumbbell Press');
+    for (const day of Object.values(state.program.days)) {
+      const i = day.exercises.findIndex((e) => e.name === 'Incline Bench Press');
+      if (i === -1) continue;
+      Object.assign(day.exercises[i], { name: bench.name, cue: bench.cue });
+      if (!day.exercises.some((e) => e.name === incline.name)) day.exercises.splice(i + 1, 0, { ...clone(incline), id: uid() });
+      if (day.focus === 'Upper chest priority, shoulders, triceps') day.focus = 'Flat & incline pressing, shoulders, triceps';
+    }
+    state.program.version = 4;
+    ui.benchUpdate = true;
+  }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* saved on next change */ }
 
   function save() {
     try {
@@ -1238,6 +1254,7 @@
 
   render();
   if (!state.settings.onboarded) showOnboarding();
+  else if (ui.benchUpdate) toast('Chest day updated: Bench Press + Incline Dumbbell Press');
 
   let lastDate = todayStr();
   document.addEventListener('visibilitychange', () => {
