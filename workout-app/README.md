@@ -5,27 +5,29 @@ A phone-friendly workout tracker built on the Muscle & Strength
 
 ## The plan
 
-| Day | Focus | Lead lift | 2nd hit for |
-| --- | --- | --- | --- |
-| Mon | Back & rear delts | Deadlift 3×5–6 | |
-| Tue | Chest & Abs | Incline Bench Press 4×6–8 | |
-| Wed | Legs | Barbell Back Squat 4×6–8 | |
-| Thu | Shoulders & Abs | Military Press 4×6–8 | Chest (incline DB press) |
-| Fri | Arms | Chin-Up 3×6–12 | Back (chin-ups), calves |
-| Sat/Sun | Rest, steps and cardio | | |
+Three workouts a week, done **in order on whichever days you make it to the gym**:
 
-- **About 2× a week per muscle** and 10–20 hard sets per muscle per week. That's more growth than the classic once-a-week split.
+| # | Workout | Usual day | Lead lift |
+| --- | --- | --- | --- |
+| 1 | Back & Biceps (+ rear delts) | Mon | Deadlift 3×5–6 |
+| 2 | Chest & Triceps (+ shoulders) | Tue | Incline Bench Press 4×6–8 |
+| 3 | Legs & Abs (+ calves) | Wed | Barbell Back Squat 4×6–8 |
+
+- **Flexible days.** The Workout tab always offers the next workout you haven't done this week, so Mon/Thu/Sat works as well as Mon/Tue/Wed. A missed workout just waits for next week. Usual days only set the order, and you can change them in Plan.
+- **Each muscle trained once a week with enough volume**: 9–12 hard sets for back, chest and legs per session, about 19–21 sets per workout (≈60–70 min).
 - **Rep ranges plus double progression.** Once you hit the top of the range on every set, the app adds weight.
 - **Effort targets.** Stop 1–2 reps short on big lifts; take the last set of accessory work to failure.
 - **6-week cycles.** 5 build weeks, then a deload week with about 60% of the sets.
-- **Goal-based targets** (build / build & lean out / get shredded): calories, protein, carbs, fat, steps and cardio minutes. A weekly check-in compares your 7-day average body weight against the target rate and tells you what to change.
+- **Goal-based targets** (build / build & lean out / get shredded): calories, macros, steps and cardio, plus a weekly weigh-in check-in.
+
+Updating from the older 5-day plan switches you to this one automatically. Logged workouts are kept and keep driving the weight suggestions; the old plan is saved in your backup data.
 
 ## The app
 
-- **Workout**: a week strip to choose the day; a preview with the exercises, sets and estimated time; then a focused view of one exercise at a time with today's target weight and reps, a form tip, warm-up sets, the next set highlighted, and a rest timer that shows what's up next. It moves to the next exercise automatically.
-- **Week**: day-by-day status, cycle progress, daily nutrition targets, weekly check-in, and sets per muscle group (done vs planned).
-- **Progress**: estimated 1-rep max for the main lifts, a chart for any exercise, body-weight trend, and history.
-- **Plan**: goal, how the plan works, workout editor (exercises, sets, reps, type, form tips), units, rest times, cycle controls, backup, and trainer notes.
+- **Workout**: a week strip showing the days you trained, chips to pick a workout (the next one is selected for you); a preview with the exercises, sets and estimated time; then a focused view of one exercise at a time with today's target weight and reps, a form tip, warm-up sets, the next set highlighted, and a rest timer that shows what's up next. It moves to the next exercise automatically.
+- **Week**: your 3 workouts with done dates, cycle progress, daily nutrition targets, weekly check-in, and sets per muscle group (done vs planned).
+- **Progress**: estimated 1-rep max for the main lifts, a chart for any exercise, body-weight trend, and history (you can change a workout's date).
+- **Plan**: goal, how the plan works, workout editor (add or remove workouts, usual day, exercises, sets, reps, type, form tips), units, rest times, cycle controls, backup, and trainer notes.
 
 Data stays in your browser (localStorage). Use **Export backup** from time to time.
 

@@ -168,8 +168,8 @@
       .sort((a, b) => (a.date < b.date ? -1 : 1));
   }
 
-  /** Count consecutive weeks (ending with the last full week, plus this week if already complete) where all 5 weekdays were trained. */
-  function weekStreak(sessions, today) {
+  /** Count consecutive weeks (ending with the last full week, plus this week if already complete) where every workout in `keys` was done. */
+  function weekStreak(sessions, today, keys = [1, 2, 3, 4, 5]) {
     const doneByWeek = new Map();
     for (const s of sessions) {
       if (!s.completedAt) continue;
@@ -179,7 +179,7 @@
     }
     const full = (wk) => {
       const set = doneByWeek.get(wk);
-      return !!set && [1, 2, 3, 4, 5].every((d) => set.has(d) || set.has(String(d)));
+      return !!set && keys.length > 0 && keys.every((d) => set.has(Number(d)) || set.has(String(d)));
     };
     let streak = 0;
     let cursor = weekStart(today);
@@ -192,6 +192,20 @@
     return streak;
   }
 
+
+  // ---------- flexible weekly rotation ----------
+  /** Workout keys in rotation order: by usual weekday, then key. */
+  function orderedKeys(program) {
+    return Object.keys(program.days).sort((a, b) => {
+      const ua = program.days[a].usual || 8, ub = program.days[b].usual || 8;
+      return ua - ub || Number(a) - Number(b);
+    });
+  }
+  /** First workout in rotation order not yet completed this week, or null when the week is done. */
+  function nextWorkout(program, doneKeys) {
+    const done = new Set([...doneKeys].map(String));
+    return orderedKeys(program).find((k) => !done.has(String(k))) ?? null;
+  }
 
   // ---------- training block (6 weeks: 5 build + 1 deload) ----------
   const BLOCK_WEEKS = 6;
@@ -250,14 +264,14 @@
     shred: { label: 'Get shredded', kcal: -500, rate: [-1, -0.5], steps: 10000, cardio: 150 },
   };
   /**
-   * Daily targets from body weight. Maintenance ≈ 15 kcal/lb for someone lifting 5×/week.
+   * Daily targets from body weight. Maintenance ≈ 14 kcal/lb lifting 3×/week, 15 kcal/lb at 4+ days.
    * Protein 1 g/lb (higher end protects muscle in a deficit), fat ~0.35 g/lb, carbs fill the rest.
    */
-  function nutrition(bodyweight, unit, goal) {
+  function nutrition(bodyweight, unit, goal, trainingDays = 3) {
     if (!bodyweight) return null;
     const lb = unit === 'kg' ? bodyweight * 2.2046 : bodyweight;
     const g = GOALS[goal] || GOALS.recomp;
-    const maintenance = lb * 15;
+    const maintenance = lb * (trainingDays >= 4 ? 15 : 14);
     const kcal = Math.round((maintenance + g.kcal) / 50) * 50;
     const protein = Math.round(lb * (goal === 'shred' ? 1.1 : 1));
     const fat = Math.round(lb * 0.35);
@@ -293,7 +307,7 @@
   }
 
   const api = {
-    BLOCK_WEEKS, GOALS, blockInfo, deloadSets, warmups, effortText, restFor, estimateMinutes, nutrition, weightTrend, checkIn,
+    orderedKeys, nextWorkout, BLOCK_WEEKS, GOALS, blockInfo, deloadSets, warmups, effortText, restFor, estimateMinutes, nutrition, weightTrend, checkIn,
     INCREMENTS, ymd, parseYmd, isoDow, weekStart, addDays, e1rm, roundTo,
     completedSets, lastLogFor, suggest, sessionVolume, sessionSetCount, exerciseHistory, weekStreak,
   };
