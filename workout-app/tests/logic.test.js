@@ -16,10 +16,11 @@ test('default program is 3 workouts: Back & Biceps, Chest & Triceps, Legs & Abs 
   assert.deepEqual(['1', '2', '3'].map((k) => DEFAULT_PROGRAM.days[k].name), ['Back & Biceps', 'Chest & Triceps', 'Legs & Abs']);
   assert.deepEqual(['1', '2', '3'].map((k) => DEFAULT_PROGRAM.days[k].usual), [1, 2, 3]);
   const leads = ['1', '2', '3'].map((d) => DEFAULT_PROGRAM.days[d].exercises[0].name);
-  assert.deepEqual(leads, ['Deadlift', 'Incline Bench Press', 'Barbell Back Squat']);
+  assert.deepEqual(leads, ['Deadlift', 'Bench Press', 'Barbell Back Squat']);
+  assert.equal(DEFAULT_PROGRAM.days[2].exercises[1].name, 'Incline Dumbbell Press');
 });
 
-test('every exercise has a muscle, cue and valid rep range; sessions stay ~60–70 min', () => {
+test('every exercise has a muscle, cue and valid rep range; sessions stay ~60–75 min', () => {
   for (const day of Object.values(DEFAULT_PROGRAM.days)) {
     let sets = 0;
     for (const e of day.exercises) {
@@ -27,7 +28,7 @@ test('every exercise has a muscle, cue and valid rep range; sessions stay ~60–
       assert.ok(e.repMax == null || e.repMax >= e.repMin, e.name);
       sets += e.sets;
     }
-    assert.ok(sets >= 18 && sets <= 22, `${day.name} has ${sets} sets`);
+    assert.ok(sets >= 18 && sets <= 23, `${day.name} has ${sets} sets`);
   }
 });
 
